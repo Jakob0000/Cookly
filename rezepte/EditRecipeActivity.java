@@ -4,13 +4,13 @@ import android.content.ContentValues;
 import android.content.Intent;
 import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Bitmap;
+import android.graphics.ImageDecoder;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
@@ -18,8 +18,10 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Toast;
-import android.graphics.ImageDecoder;
 import android.widget.LinearLayout.LayoutParams;
+import android.widget.AutoCompleteTextView;
+import android.widget.ArrayAdapter;
+
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -69,7 +71,6 @@ public class EditRecipeActivity extends AppCompatActivity {
         recipeImageView = findViewById(R.id.iv_edit_recipe_image);
         llIngredientsContainer = findViewById(R.id.ll_ingredients_container);
         btnAddIngredient = findViewById(R.id.btn_add_ingredient);
-
         Button selectImageButton = findViewById(R.id.btn_select_image);
         Button saveButton = findViewById(R.id.btn_save_recipe);
 
@@ -87,10 +88,10 @@ public class EditRecipeActivity extends AppCompatActivity {
             } else {
                 recipeImageView.setImageResource(R.drawable.ic_placeholder);
             }
-            // Zutaten (als zusammengefügter String) laden und in Zeilen zerlegen
+            // Zutaten laden und in Zeilen zerlegen
             loadIngredients(currentRecipe.getIngredients());
 
-            // Allergene und Küchengeräte (Tools) als CheckBoxen anzeigen
+            // Allergene und Tools als CheckBoxen anzeigen
             setupKitchenTools();
             setupAllergens();
         }
@@ -102,8 +103,7 @@ public class EditRecipeActivity extends AppCompatActivity {
     }
 
     /**
-     * Zerlegt den gespeicherten Zutaten-String (Zeilen im Format "Menge: Zutat")
-     * und fügt für jede Zeile eine Eingabezeile im Container hinzu.
+     * Zerlegt den gespeicherten Zutaten-String und fügt für jede Zeile eine Eingabezeile hinzu.
      */
     private void loadIngredients(String ingredientsString) {
         llIngredientsContainer.removeAllViews();
@@ -116,14 +116,12 @@ public class EditRecipeActivity extends AppCompatActivity {
                 addIngredientRow(quantity, ingredient);
             }
         }
-        // Füge eine leere Zeile hinzu, falls der Benutzer weitere Zutaten hinzufügen möchte.
+        // Leere Zeile hinzufügen
         addIngredientRow();
     }
 
     /**
      * Fügt dem Zutaten-Container eine neue Zeile hinzu.
-     * @param quantity Vorbelegter Wert für die Menge (kann leer sein)
-     * @param ingredient Vorbelegter Wert für die Zutat (kann leer sein)
      */
     private void addIngredientRow(String quantity, String ingredient) {
         LinearLayout row = new LinearLayout(this);
@@ -135,24 +133,31 @@ public class EditRecipeActivity extends AppCompatActivity {
         EditText etQuantity = new EditText(this);
         LayoutParams quantityParams = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1);
         etQuantity.setLayoutParams(quantityParams);
-        etQuantity.setHint("Menge (z.B. 200g)");
+        etQuantity.setHint("Menge (z.B. 200g, 1L)");
         etQuantity.setText(quantity);
 
-        EditText etIngredient = new EditText(this);
+        // AutoCompleteTextView für Zutat – Vorschläge aus arrays.xml
+        AutoCompleteTextView etIngredient = new AutoCompleteTextView(this);
         LayoutParams ingredientParams = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 2);
         etIngredient.setLayoutParams(ingredientParams);
         etIngredient.setHint("Zutat");
         etIngredient.setText(ingredient);
+        String[] ingredientSuggestions = getResources().getStringArray(R.array.ingredient_suggestions);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_dropdown_item_1line, ingredientSuggestions);
+        etIngredient.setAdapter(adapter);
+        etIngredient.setThreshold(1);
 
         row.addView(etQuantity);
         row.addView(etIngredient);
         llIngredientsContainer.addView(row);
     }
 
-    // Leere Zeile hinzufügen
+    // Überladene Methode für eine leere Zeile
     private void addIngredientRow() {
         addIngredientRow("", "");
     }
+
 
     private void setupKitchenTools() {
         GridLayout toolsLayout = findViewById(R.id.grid_tools);
@@ -173,13 +178,22 @@ public class EditRecipeActivity extends AppCompatActivity {
         for (String allergen : allergensArray) {
             CheckBox checkBox = new CheckBox(this);
             checkBox.setText(allergen);
+            // Setze Klicklistener, um visuelles Feedback zu geben
+            checkBox.setOnClickListener(v -> {
+                if (((CheckBox)v).isChecked()) {
+                    Toast.makeText(EditRecipeActivity.this, allergen + " ausgewählt", Toast.LENGTH_SHORT).show();
+                    v.setBackgroundColor(getResources().getColor(R.color.selectedColor));
+                } else {
+                    Toast.makeText(EditRecipeActivity.this, allergen + " entfernt", Toast.LENGTH_SHORT).show();
+                    v.setBackgroundColor(getResources().getColor(android.R.color.transparent));
+                }
+            });
             allergensLayout.addView(checkBox);
         }
     }
 
     /**
-     * Liest alle Zutatenzeilen aus dem Container und fügt sie als zusammengefügten String zusammen.
-     * Jede Zeile wird im Format "Menge: Zutat" gespeichert.
+     * Liest alle Zutatenzeilen aus dem Container und baut einen String im Format "Menge: Zutat".
      */
     private String collectIngredients() {
         StringBuilder ingredientsBuilder = new StringBuilder();

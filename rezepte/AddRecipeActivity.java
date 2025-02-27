@@ -2,21 +2,23 @@ package com.example.rezepte;
 
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.ImageDecoder;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Toast;
-import android.graphics.ImageDecoder;
 import android.widget.LinearLayout.LayoutParams;
+import android.widget.AutoCompleteTextView;
+import android.widget.ArrayAdapter;
+
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
@@ -35,11 +37,11 @@ public class AddRecipeActivity extends AppCompatActivity {
     private Uri imageUri;
     private DatabaseHelper dbHelper;
 
-    // Container für die dynamisch hinzugefügten Zutatenzeilen und Button zum Hinzufügen weiterer Zeilen
+    // Container für dynamische Zutatenzeilen und Button zum Hinzufügen
     private LinearLayout llIngredientsContainer;
     private Button btnAddIngredient;
 
-    // Listen zum Speichern der ausgewählten Allergene und Tools
+    // Listen für ausgewählte Allergene und Tools
     private List<String> selectedAllergens;
     private List<String> selectedTools;
 
@@ -70,37 +72,19 @@ public class AddRecipeActivity extends AppCompatActivity {
         addIngredientRow();
 
         // Bild auswählen
-        chooseImageButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                openImagePicker();
-            }
-        });
+        chooseImageButton.setOnClickListener(v -> openImagePicker());
 
         // Rezept speichern
-        saveRecipeButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                saveRecipe();
-            }
-        });
+        saveRecipeButton.setOnClickListener(v -> saveRecipe());
 
         // Weitere Zutatenzeile hinzufügen
-        btnAddIngredient.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                addIngredientRow();
-            }
-        });
+        btnAddIngredient.setOnClickListener(v -> addIngredientRow());
     }
 
     /**
-     * Fügt dem Zutaten-Container (llIngredientsContainer) eine neue Zeile hinzu.
-     * Jede Zeile besteht aus zwei EditTexts:
-     * - Links: Menge inkl. Einheit (z. B. "200g" oder "1L")
-     * - Rechts: Name der Zutat (z. B. "Tomaten")
+     * Fügt eine neue Zutatenzeile zum Container hinzu.
      */
-    private void addIngredientRow() {
+    private void addIngredientRow(String quantity, String ingredient) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         LayoutParams rowParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
@@ -111,18 +95,34 @@ public class AddRecipeActivity extends AppCompatActivity {
         LayoutParams quantityParams = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1);
         etQuantity.setLayoutParams(quantityParams);
         etQuantity.setHint("Menge (z.B. 200g, 1L)");
+        etQuantity.setText(quantity);
 
-        EditText etIngredient = new EditText(this);
+        // AutoCompleteTextView für Zutat – Vorschläge aus arrays.xml
+        AutoCompleteTextView etIngredient = new AutoCompleteTextView(this);
         LayoutParams ingredientParams = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 2);
         etIngredient.setLayoutParams(ingredientParams);
         etIngredient.setHint("Zutat");
+        etIngredient.setText(ingredient);
+        String[] ingredientSuggestions = getResources().getStringArray(R.array.ingredient_suggestions);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_dropdown_item_1line, ingredientSuggestions);
+        etIngredient.setAdapter(adapter);
+        etIngredient.setThreshold(1);
 
         row.addView(etQuantity);
         row.addView(etIngredient);
-
         llIngredientsContainer.addView(row);
     }
 
+    // Überladene Methode für eine leere Zeile
+    private void addIngredientRow() {
+        addIngredientRow("", "");
+    }
+
+
+    /**
+     * Initialisiert die Allergen-Icons und setzt die Klicklistener.
+     */
     private void setupAllergenIcons() {
         int[] allergenIconIds = {
                 R.id.ic_gluten,
@@ -170,8 +170,12 @@ public class AddRecipeActivity extends AppCompatActivity {
                         Toast.LENGTH_SHORT).show();
             }
         });
+
     }
 
+    /**
+     * Initialisiert die Tool-Icons und setzt die Klicklistener.
+     */
     private void setupToolIcons() {
         int[] toolIconIds = {
                 R.id.ic_ofen,
@@ -211,6 +215,7 @@ public class AddRecipeActivity extends AppCompatActivity {
                     Toast.LENGTH_SHORT).show();
         });
     }
+
 
     private void openImagePicker() {
         Intent intent = new Intent();
@@ -288,8 +293,7 @@ public class AddRecipeActivity extends AppCompatActivity {
     }
 
     /**
-     * Geht alle Zutatenzeilen im Container durch und baut einen String,
-     * in dem jede Zeile im Format "Menge: Zutat" gespeichert wird.
+     * Geht alle Zutatenzeilen im Container durch und baut einen String im Format "Menge: Zutat".
      */
     private String collectIngredients() {
         StringBuilder ingredientsBuilder = new StringBuilder();
@@ -313,6 +317,5 @@ public class AddRecipeActivity extends AppCompatActivity {
             }
         }
         return ingredientsBuilder.toString().trim();
-
     }
 }
